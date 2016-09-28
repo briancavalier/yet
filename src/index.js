@@ -1,5 +1,23 @@
 import { killWith, killBoth } from './kill'
 
+// Create a future whose value is already known
+export const of = x => new Known(x)
+
+// Create a future that will receive its value by running a function
+export const future = run => new Resolver(run)
+
+// Execute the underlying task that will produce the future's value
+// Provide a function to consume the future's eventual value once
+// it is computed
+export const fork = (f, future) => future.run(new Handler(f))
+
+// Is this actually useful in practice or only when playing around?
+export const delay = (ms, x) =>
+  future(fulfill => killWith(clearTimeout, setTimeout(fulfill, ms, x)))
+
+// Return a future equivalent to the earlier of two futures
+export const race = (f1, f2) => new Race(f1, f2)
+
 // Base Future, provides default implementations for future API
 // Specializations may provide optimized implementations of these
 class Future {
@@ -157,18 +175,7 @@ class ApVar {
   }
 }
 
-export const future = run => new Resolver(run)
-export const of = x => new Known(x)
-
-export const fork = (f, future) => future.run(new Handler(f))
-
-export const delay = (ms, x) =>
-  future(fulfill => killWith(clearTimeout, setTimeout(fulfill, ms, x)))
-
-export const race = (f1, f2) => new Race(f1, f2)
-
-export const ap = (fab, fa) => new Ap(fab, fa)
-
+// Typeclass delegation helpers
 const _map = (f, a) =>
   a && typeof a.map === 'function' ? a.map(f) : f(a)
 
