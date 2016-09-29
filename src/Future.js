@@ -1,4 +1,4 @@
-import { emptyFutureValue } from './FutureValue'
+import { emptyFutureValue, copyFrom } from './FutureValue'
 
 // Create a future that will receive its value by running a function
 export const future = run => new Resolver(run)
@@ -6,7 +6,7 @@ export const future = run => new Resolver(run)
 // Execute the underlying task that will produce the future's value
 // Provide a function to consume the future's eventual value once
 // it is computed
-export const fork = future => future.run(Date.now, passthrough)
+export const run = future => future.run(Date.now, passthrough)
 
 // Base Future, provides default implementations for future API
 // Specializations may provide optimized implementations of these
@@ -31,8 +31,7 @@ class Resolver extends Future {
 }
 
 const runResolver = (future, now, action, x) =>
-  action.react(emptyFutureValue().setFuture(now(), x))
-    .when(({ time, value }) => future.setFuture(time, value))
+  copyFrom(action.react(emptyFutureValue().setFuture(now(), x)), future)
 
 const passthrough = {
   react (fv) {

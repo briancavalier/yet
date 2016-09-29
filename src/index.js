@@ -1,1 +1,1 @@
-export { future, fork } from './Future'
+export { future, run } from './Future'

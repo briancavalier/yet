@@ -21,10 +21,6 @@ class FutureValue {
     return map(f, this)
   }
 
-  when(f) {
-    when(new When(f), this)
-  }
-
   setFuture(t, x) {
     setFuture(t, x, this)
     return this
@@ -40,8 +36,6 @@ class Never {
   map(f) {
     return this
   }
-
-  when (f) {}
 
   setFuture(t, x) {
     throw new Error('Can\'t set never')
@@ -70,14 +64,16 @@ class Map {
   }
 }
 
-class When {
-  constructor(f) {
-    this.f = f
+export const copyFrom = (from, to) =>
+  when(new CopyFrom(to), from)
+
+class CopyFrom {
+  constructor (future) {
+    this.future = future
   }
 
-  run(future) {
-    const f = this.f
-    f(future)
+  run({ time, value }) {
+    this.future.setFuture(time, value)
   }
 }
 
@@ -103,7 +99,7 @@ function runActions(f) {
 
 function setFuture(t, x, f) {
   if(f.time < Infinity) {
-    return
+    throw new Error('future already set')
   }
 
   f.time = t
