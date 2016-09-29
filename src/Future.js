@@ -1,4 +1,5 @@
-import { emptyFutureValue, copyFrom } from './FutureValue'
+import { emptyFutureValue } from './FutureValue'
+import * as F from './fn'
 
 // Create a future that will receive its value by running a function
 export const future = run => new Resolver(run)
@@ -6,7 +7,11 @@ export const future = run => new Resolver(run)
 // Execute the underlying task that will produce the future's value
 // Provide a function to consume the future's eventual value once
 // it is computed
-export const run = future => future.run(Date.now, passthrough)
+export const run = future => {
+  const futureValue = emptyFutureValue()
+  const kill = future.run(Date.now, new SetFutureValue(futureValue))
+  return { kill: () => kill.kill(), futureValue }
+}
 
 // Base Future, provides default implementations for future API
 // Specializations may provide optimized implementations of these
@@ -24,19 +29,17 @@ class Resolver extends Future {
   }
 
   run (now, action) {
-    const futureValue = emptyFutureValue()
-    const kill = this._run(x => runResolver(futureValue, now, action, x))
-    return { kill, futureValue }
+    return this._run(x => action.react(now(), x))
   }
 }
 
-const runResolver = (future, now, action, x) =>
-  copyFrom(action.react(emptyFutureValue().setFuture(now(), x)), future)
-
-const passthrough = {
-  react (fv) {
-    return fv
-  }
+class SetFutureValue {
+    constructor (futureValue) {
+      this.futureValue = futureValue
+    }
+    react(t, x) {
+      return this.futureValue.write(t, x)
+    }
 }
 
 // A Future whose value is the fmapped value of another Future
@@ -58,7 +61,7 @@ class Mapped {
     this.reaction = reaction
   }
 
-  react (fv) {
-    return this.reaction.react(fv.map(this.ab))
+  react (t, x) {
+    return this.reaction.react(t, F.map(this.ab, x))
   }
 }

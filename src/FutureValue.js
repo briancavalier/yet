@@ -1,3 +1,5 @@
+import * as F from './fn'
+
 // Create a new FutureValue whose value arrived at time t
 export const at = (t, x) => new FutureValue(t, x)
 
@@ -21,7 +23,7 @@ class FutureValue {
     return map(f, this)
   }
 
-  setFuture(t, x) {
+  write(t, x) {
     setFuture(t, x, this)
     return this
   }
@@ -37,7 +39,7 @@ class Never {
     return this
   }
 
-  setFuture(t, x) {
+  write(t, x) {
     throw new Error('Can\'t set never')
   }
 }
@@ -45,12 +47,12 @@ class Never {
 export const never = new Never()
 
 export const map = (f, future) =>
-  future.time < Infinity ? at(future.time, _map(f,future.value))
+  future.time < Infinity ? at(future.time, F.map(f,future.value))
     : mapFuture(f, future, emptyFutureValue())
 
-function mapFuture(f, p, future) {
-  when(new Map(f, future), p)
-  return future
+function mapFuture(f, future, futureResult) {
+  when(new Map(f, futureResult), future)
+  return futureResult
 }
 
 class Map {
@@ -60,58 +62,44 @@ class Map {
   }
 
   run({ time, value }) {
-    this.future.setFuture(time, _map(this.f, value))
+    this.future.write(time, F.map(this.f, value))
   }
 }
 
-export const copyFrom = (from, to) =>
-  when(new CopyFrom(to), from)
-
-class CopyFrom {
-  constructor (future) {
-    this.future = future
-  }
-
-  run({ time, value }) {
-    this.future.setFuture(time, value)
-  }
-}
-
-function when(action, f) {
-  if(f.time < Infinity) {
-    action.run(f)
-  } if (f.action === undefined) {
-    f.action = action
+// Add an action to the awaiters for the provided future
+function when(action, future) {
+  if(future.time < Infinity) {
+    action.run(future)
+  } if (future.action === undefined) {
+    future.action = action
   } else {
-    f[f.length++] = action
+    future[future.length++] = action
   }
 }
 
-function runActions(f) {
-  f.action.run(f)
-  f.action = undefined
+// Run all the awaiting actions when a future value is set
+function runActions(future) {
+  future.action.run(future)
+  future.action = undefined
 
-  for (let i = 0; i < f.length; ++i) {
-    f[i].run(f)
-    f[i] = undefined
+  for (let i = 0; i < future.length; ++i) {
+    future[i].run(future)
+    future[i] = undefined
   }
 }
 
-function setFuture(t, x, f) {
-  if(f.time < Infinity) {
+// Set the time and value of a future, triggering all awaiters
+function setFuture(t, x, future) {
+  if(future.time < Infinity) {
     throw new Error('future already set')
   }
 
-  f.time = t
-  f.value = x
+  future.time = t
+  future.value = x
 
-  if(f.action === undefined) {
+  if(future.action === undefined) {
     return
   }
 
-  runActions(f)
+  runActions(future)
 }
-
-// Typeclass delegation helpers
-const _map = (f, a) =>
-  a && typeof a.map === 'function' ? a.map(f) : f(a)
