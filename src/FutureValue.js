@@ -1,8 +1,10 @@
 import * as F from './fn'
 
+// at :: Time -> a -> FutureValue t a
 // Create a new FutureValue whose value arrived at time t
 export const at = (t, x) => new FutureValue(t, x)
 
+// pending :: () -> FutureValue t a
 // Create a new FutureValue whose value hasn't yet arrived
 export const pending = () => at(Infinity, undefined)
 
