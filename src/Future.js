@@ -1,4 +1,4 @@
-import { emptyFutureValue } from './FutureValue'
+import { pending } from './FutureValue'
 import * as F from './fn'
 
 // Create a future that will receive its value by running a function
@@ -8,7 +8,7 @@ export const future = run => new Resolver(run)
 // Provide a function to consume the future's eventual value once
 // it is computed
 export const run = future => {
-  const futureValue = emptyFutureValue()
+  const futureValue = pending()
   const kill = future.run(Date.now, new SetFutureValue(futureValue))
   return { kill: () => kill.kill(), futureValue }
 }
@@ -37,12 +37,13 @@ class SetFutureValue {
     constructor (futureValue) {
       this.futureValue = futureValue
     }
+
     react(t, x) {
       return this.futureValue.write(t, x)
     }
 }
 
-// A Future whose value is the fmapped value of another Future
+// A Future whose value is the mapped value of another Future
 class Map extends Future {
   constructor (ab, future) {
     super()

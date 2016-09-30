@@ -4,7 +4,7 @@ import * as F from './fn'
 export const at = (t, x) => new FutureValue(t, x)
 
 // Create a new FutureValue whose value hasn't yet arrived
-export const emptyFutureValue = () => at(Infinity, undefined)
+export const pending = () => at(Infinity, undefined)
 
 // Conceptually, a FutureValue is a value that becomes known
 // at a specific time (the temperature outside next Tuesday at 5pm).
@@ -48,7 +48,7 @@ export const never = new Never()
 
 export const map = (f, future) =>
   future.time < Infinity ? at(future.time, F.map(f,future.value))
-    : mapFuture(f, future, emptyFutureValue())
+    : mapFuture(f, future, pending())
 
 function mapFuture(f, future, futureResult) {
   when(new Map(f, futureResult), future)
@@ -66,7 +66,41 @@ class Map {
   }
 }
 
+// Return a FutureValue that is equivalent to the earlier of
+// two FutureValue
+export const earliest = (breakTie, fv1, fv2) =>
+  fv1.time === Infinity && fv2.time === Infinity
+    ? raceFutureWith(breakTie, fv1, fv2, pending()) // both pending
+    : earliestOf(breakTie, fv1, fv2) // one isn't pending
+
+const raceFutureWith = (breakTie, fv1, fv2, futureResult) => {
+  const race = new Race(breakTie, fv1, fv2, futureResult)
+  when(race, fv1)
+  when(race, fv2)
+  return futureResult
+}
+
+const earliestOf = (breakTie, fv1, fv2) =>
+  fv1.time === fv2.time
+    ? breakTie(fv1, fv2) ? fv1 : fv2
+    : fv1.time < fv2.time ? fv1 : fv2
+
+class Race {
+  constructor (breakTie, fv1, fv2, future) {
+    this.breakTie = breakTie
+    this.fv1 = fv1
+    this.fv2 = fv2
+    this.future = future
+  }
+
+  run (fv) {
+    const { time, value } = earliestOf(this.breakTie, this.fv1, this.fv2)
+    this.future.write(time, value)
+  }
+}
+
 // Add an action to the awaiters for the provided future
+// or execute it immediately if the future's value is known
 function when(action, future) {
   if(future.time < Infinity) {
     action.run(future)
