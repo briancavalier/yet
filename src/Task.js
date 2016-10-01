@@ -1,4 +1,5 @@
 import { pending } from './FutureValue'
+import { killBoth, neverKill } from './kill'
 import * as F from './fn'
 
 // task :: ((a -> ()) -> Kill) -> Task a
@@ -11,8 +12,10 @@ export const task = run => new Resolver(run)
 export const run = task => {
   const futureValue = pending()
   const kill = task.run(Date.now, new SetFutureValue(futureValue))
-  return { kill: () => kill.kill(), futureValue }
+  return [() => kill.kill(), futureValue]
 }
+
+export const race = (task1, task2) => new Race(task1, task2)
 
 // Base Task, provides default implementations of Task API
 // Specializations may provide optimized implementations of methods
@@ -65,5 +68,34 @@ class Mapped {
 
   react (t, x) {
     return this.reaction.react(t, F.map(this.ab, x))
+  }
+}
+
+class Race extends Task {
+  constructor (t1, t2) {
+    super()
+    this.t1 = t1
+    this.t2 = t2
+  }
+
+  run (now, action) {
+    const r1 = new Raced(action)
+    const r2 = new Raced(action)
+    r2.kill = this.t1.run(now, r1)
+    r1.kill = this.t2.run(now, r2)
+
+    return killBoth(r1.kill, r2.kill)
+  }
+}
+
+class Raced {
+  constructor (action) {
+    this.kill = neverKill
+    this.action = action
+  }
+
+  react (t, x) {
+    this.kill.kill()
+    this.action.react(t, x)
   }
 }

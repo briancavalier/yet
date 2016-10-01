@@ -30,3 +30,6 @@ class KillBoth {
   }
 }
 
+export const neverKill = {
+  kill () {}
+}
