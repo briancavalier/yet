@@ -4,7 +4,8 @@ import * as F from './fn'
 
 // task :: ((a -> ()) -> Kill) -> Task a
 // Create a Task that will produce a result by running a function
-export const task = run => new Resolver(run)
+export const task = run =>
+  new Task(resolver, run)
 
 // run :: Task a -> FutureValue a
 // Execute a Task that will produce a result.  Returns a FutureValue
@@ -15,27 +16,36 @@ export const run = task => {
   return [() => kill.kill(), futureValue]
 }
 
-export const race = (task1, task2) => new Race(task1, task2)
+// race :: Task a -> Task a -> Task a
+// Given two Tasks, return a Task equivalent to the one that produces a
+// value earlier, and kill the other Task.
+export const race = (t1, t2) =>
+  new Task(raceTasks, { t1, t2 })
 
 // Base Task, provides default implementations of Task API
 // Specializations may provide optimized implementations of methods
 class Task {
-  map (f) {
-    return new Map(f, this)
+  constructor (runTask, state) {
+    this.runTask = runTask
+    this.state = state
+  }
+
+  map (ab) {
+    return new Task(mapTask, { ab, task: this })
+  }
+
+  chain (atb) {
+    return new Task(chainTask, { atb, task: this })
+  }
+
+  run (now, action) {
+    return this.runTask(now, action, this.state)
   }
 }
 
 // Run a callback-accepting function to produce a result
-class Resolver extends Task {
-  constructor (run) {
-    super()
-    this._run = run
-  }
-
-  run (now, action) {
-    return this._run(x => action.react(now(), x))
-  }
-}
+const resolver = (now, action, run) =>
+  run(x => action.react(now(), x))
 
 class SetFutureValue {
     constructor (futureValue) {
@@ -48,44 +58,65 @@ class SetFutureValue {
 }
 
 // A Task whose value is the mapped result of another Task
-class Map extends Task {
-  constructor (ab, task) {
-    super()
-    this.ab = ab
-    this.task = task
-  }
-
-  run (now, action) {
-    return this.task.run(now, new Mapped(this.ab, action))
-  }
-}
+const mapTask = (now, action, { ab, task }) =>
+  task.run(now, new Mapped(ab, action))
 
 class Mapped {
-  constructor (ab, reaction) {
+  constructor (ab, action) {
     this.ab = ab
-    this.reaction = reaction
+    this.action = action
   }
 
   react (t, x) {
-    return this.reaction.react(t, F.map(this.ab, x))
+    return this.action.react(t, F.map(this.ab, x))
   }
 }
 
-class Race extends Task {
-  constructor (t1, t2) {
-    super()
-    this.t1 = t1
-    this.t2 = t2
+// Task that appends more work to another Task, taking the
+// previous Task's output as input
+const chainTask = (now, action, { atb, task }) => {
+  const unlessKilled = new UnlessKilled(action);
+  return killBoth(unlessKilled, task.run(now, new Chained(now, atb, unlessKilled)))
+}
+
+class Chained {
+  constructor (now, atb, action) {
+    this.now = now
+    this.atb = atb
+    this.action = action
   }
 
-  run (now, action) {
-    const r1 = new Raced(action)
-    const r2 = new Raced(action)
-    r2.kill = this.t1.run(now, r1)
-    r1.kill = this.t2.run(now, r2)
-
-    return killBoth(r1.kill, r2.kill)
+  react (t, x) {
+    const atb = this.atb
+    return atb(x).run(this.now, this.action)
   }
+}
+
+class UnlessKilled {
+  constructor (action) {
+    this.action = action
+  }
+
+  react (t, x) {
+    return this.action.react(t, x)
+  }
+
+  kill () {
+    this.action = emptyAction
+  }
+}
+
+const emptyAction = {
+  react (t, x) {}
+}
+
+const raceTasks = (now, action, { t1, t2 }) => {
+  const r1 = new Raced(action)
+  const r2 = new Raced(action)
+  r2.kill = t1.run(now, r1)
+  r1.kill = t2.run(now, r2)
+
+  return killBoth(r1.kill, r2.kill)
 }
 
 class Raced {
