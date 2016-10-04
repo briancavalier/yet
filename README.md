@@ -39,11 +39,10 @@ Execute a Task.  This forces a Task to execute immediately, returning a `Kill` t
 Create a Task that will produce a result by running a resolver function.
 
 ```js
-import { task, killWith } from 'yafi'
+import { task, killWith, runTask } from '@briancavalier/yet'
 
-const [killTimeout, futureValue] = task(resolve => {
-    return killWith(clearTimeout, setTimeout(resolve, 1000, 'hello world'))
-})
+const t = task(resolve =>  killWith(clearTimeout, setTimeout(resolve, 1000, 'hello world')))
+const [killTimeout, futureValue] = runTask(t)
 ```
 
 ### map :: Task a ~> (a -> b) -> Task b
