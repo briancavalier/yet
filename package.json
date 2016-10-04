@@ -9,6 +9,8 @@
     "release": "northbrook release"
   },
   "keywords": [
+    "async",
+    "task",
     "future"
   ],
   "author": "brian@hovercraftstudios.com",
