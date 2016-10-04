@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Yet another future implementation",
   "main": "dist/index.js",
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1",
