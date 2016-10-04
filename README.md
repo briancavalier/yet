@@ -10,7 +10,7 @@ Tasks are:
 Running a Task returns a pair: `[killTask, futureValue]`:
 
 - `killTask :: () -> void`: function to abort the Task.  If called before the Task finishes, `futureValue` will remain pending forever.
-- `futureValue :: FutureValue a`: a [FutureValue](#futurevalue) representing the Task's result.
+- `futureValue :: FutureValue a`: FutureValue representing the Task's result.
 
 ## FutureValue
 
@@ -25,9 +25,9 @@ In contrast to Tasks, FutureValues are:
 
 ## Types
 
-`type Resolver a = ((a -> ()) -> Kill`: function to set a Task's result, and return a Kill that can be used to kill the Task while it is still in flight.
-`type Kill = { kill :: () -> () }`: Object will a zero-arg `kill` method to kill an in flight Task.
-`type KillFunc = () -> ()`: 
+- `type Resolver a = ((a -> ()) -> Kill`: function to set a Task's result, and return a Kill that can be used to kill the Task while it is still in flight.
+- `type Kill = { kill :: () -> () }`: Object will a zero-arg `kill` method to kill an in flight Task.
+- `type KillFunc = () -> ()`: 
 
 
 ## Task
@@ -36,7 +36,7 @@ In contrast to Tasks, FutureValues are:
 
 Execute a Task.  This forces a Task to execute immediately, returning a `KillFunc` that can be used to abort the Task, and a `FutureValue` representing the Task's eventual result.
 
-### task :: Resolver a &rarr; Task a
+### task :: Resolver a -> Task a
 
 Create a Task that will produce a result by running a resolver function.
 
@@ -53,6 +53,8 @@ const [killTask, futureValue] = task(resolve => {
 Transform a Task's eventual result.
 
 ### ap :: Task a ~> Task (a -> b) -> Task b
+
+Given a Task that will produce a value and a Task that will produce a function, create a Task that will apply the function to the value and produce the result.
 
 ### lift2 :: (a -> b -> c) -> Task a -> Task b -> Task c
 
