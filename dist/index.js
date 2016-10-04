@@ -156,7 +156,8 @@ var KillWith = function KillWith(kill, key) {
 };
 
 KillWith.prototype.kill = function kill () {
-  this._kill(this.key);
+  var kill = this._kill;
+  return kill(this.key);
 };
 
 // Combine two kills into a new one that kills both
