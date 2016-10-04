@@ -14,7 +14,7 @@ export const task = run =>
 export const run = task => {
   const futureValue = pending()
   const kill = task.run(Date.now, new SetFutureValue(futureValue))
-  return [() => kill.kill(), futureValue]
+  return [kill, futureValue]
 }
 
 // race :: Task a -> Task a -> Task a

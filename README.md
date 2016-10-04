@@ -26,15 +26,13 @@ In contrast to Tasks, FutureValues are:
 ## Types
 
 - `type Resolver a = ((a -> ()) -> Kill`: function to set a Task's result, and return a Kill that can be used to kill the Task while it is still in flight.
-- `type Kill = { kill :: () -> () }`: Object will a zero-arg `kill` method to kill an in flight Task.
-- `type KillFunc = () -> ()`: 
-
+- `type Kill = { kill :: () -> () }`: object with a `kill` method to kill an in-flight Task.
 
 ## Task
 
-### runTask :: Task a -> [KillFunc, FutureValue a]
+### runTask :: Task a -> [Kill, FutureValue a]
 
-Execute a Task.  This forces a Task to execute immediately, returning a `KillFunc` that can be used to abort the Task, and a `FutureValue` representing the Task's eventual result.
+Execute a Task.  This forces a Task to execute immediately, returning a `Kill` that can be used to kill the Task, and a `FutureValue` representing the Task's eventual result.
 
 ### task :: Resolver a -> Task a
 
@@ -43,7 +41,7 @@ Create a Task that will produce a result by running a resolver function.
 ```js
 import { task, killWith } from 'yafi'
 
-const [killTask, futureValue] = task(resolve => {
+const [killTimeout, futureValue] = task(resolve => {
     return killWith(clearTimeout, setTimeout(resolve, 1000, 'hello world'))
 })
 ```
@@ -75,7 +73,7 @@ Helper to create a Kill instance whose `kill` method calls the provided function
 ```js
 const killTimeout = killWith(clearTimeout, setTimeout(x => console.log(x), 1000, 'Hi!'))
 
-killTimeout() // Hi! is never logged
+killTimeout.kill() // Hi! is never logged
 ```
 
 ### killBoth :: Kill -> Kill -> Kill
@@ -88,7 +86,7 @@ const killTimeout2 = killWith(clearTimeout, setTimeout(x => console.log(x), 2000
 
 const killTimeouts = killBoth(killTimeout1, killTimeout2)
 
-killTimeouts() // Neither Hello nor World will be logged
+killTimeouts.kill() // Neither Hello nor World will be logged
 ```
 
 ## FutureValue
