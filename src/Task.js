@@ -11,7 +11,7 @@ export const task = run =>
 // Execute a Task that will produce a result.  Returns a function to
 // kill the in-progress Task and a FutureValue representing the
 // eventual result.
-export const run = task => {
+export const runTask = task => {
   const futureValue = pending()
   const kill = task.run(Date.now, new SetFutureValue(futureValue))
   return [kill, futureValue]
