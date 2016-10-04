@@ -11,7 +11,8 @@ class KillWith {
   }
 
   kill () {
-    this._kill(this.key)
+    const kill = this._kill
+    return kill(this.key)
   }
 }
 
