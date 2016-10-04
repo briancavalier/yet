@@ -1,1 +1,1 @@
-export { task, run, race } from './Task'
+export { task, run, race, lift2 } from './Task'

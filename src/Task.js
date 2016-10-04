@@ -7,9 +7,10 @@ import * as F from './fn'
 export const task = run =>
   new Task(resolver, run)
 
-// run :: Task a -> FutureValue a
-// Execute a Task that will produce a result.  Returns a FutureValue
-// representing the eventual result.
+// run :: Task a -> (KillFunc, FutureValue a)
+// Execute a Task that will produce a result.  Returns a function to
+// kill the in-progress Task and a FutureValue representing the
+// eventual result.
 export const run = task => {
   const futureValue = pending()
   const kill = task.run(Date.now, new SetFutureValue(futureValue))
@@ -22,8 +23,13 @@ export const run = task => {
 export const race = (t1, t2) =>
   new Task(raceTasks, { t1, t2 })
 
-// Base Task, provides default implementations of Task API
-// Specializations may provide optimized implementations of methods
+// lift2 :: (a -> b -> c) -> Task a -> Task b -> Task c
+// Combine the results of 2 tasks
+export const lift2 = (abc, ta, tb) =>
+  new Task(lift2Tasks, { abc, ta, tb })
+
+// Task type
+// A composable unit of async work that produces a FutureValue
 class Task {
   constructor (runTask, state) {
     this.runTask = runTask
@@ -32,6 +38,10 @@ class Task {
 
   map (ab) {
     return new Task(mapTask, { ab, task: this })
+  }
+
+  ap (tfab) {
+    return lift2(F.apply, tfab, this)
   }
 
   chain (atb) {
@@ -128,5 +138,32 @@ class Raced {
   react (t, x) {
     this.kill.kill()
     this.action.react(t, x)
+  }
+}
+
+const lift2Tasks = (now, action, { abc, ta, tb }) => {
+  // TODO: find a better way
+  // Kinda gross: closing over too much and allocating 2 objects
+  let count = 2
+  const check = t =>
+    --count === 0 && action.react(t, F.lift2(abc, a.value, b.value))
+
+  const a = new LiftVar(check)
+  const b = new LiftVar(check)
+
+  return killBoth(ta.run(now, a), tb.run(now, b))
+}
+
+// mutable container to hold task results for in-flight
+// liftN operations
+class LiftVar {
+  constructor (check) {
+    this.check = check
+    this.value = undefined
+  }
+
+  react (t, x) {
+    this.value = x
+    return this.check(t)
   }
 }
