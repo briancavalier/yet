@@ -1,11 +1,11 @@
 import * as F from './fn'
 
-// at :: Time -> a -> FutureValue t a
-// Create a new FutureValue whose value arrived at time t
-export const at = (t, x) => new FutureValue(t, x)
+// of :: a -> FutureValue a
+// Create a FutureValue whose value has always been known to be x
+export const of = x => at(0, x)
 
 // pending :: () -> FutureValue t a
-// Create a new FutureValue whose value hasn't yet arrived
+// Create a new FutureValue whose value isn't known yet
 export const pending = () => at(Infinity, undefined)
 
 // Conceptually, a FutureValue is a value that becomes known
@@ -13,19 +13,35 @@ export const pending = () => at(Infinity, undefined)
 // Neither the time nor value can be known until the time occurs.
 // Mechanically, here, it's a write-once, immutable container for a
 // (time, value) pair, that allows zero or more awaiters.
-class FutureValue {
+export class FutureValue {
   constructor(time, value) {
     this.time = time
     this.value = value
-    this.action = undefined
-    this.length = 0
+    this._action = undefined
+    this._length = 0
   }
 
-  map(f) {
+  static of (x) {
+    return of(x)
+  }
+
+  of (x) {
+    return of(x)
+  }
+
+  map (f) {
     return map(f, this)
   }
 
-  write(t, x) {
+  extend (f) {
+    return this.map(_ => f(this))
+  }
+
+  toString () {
+    return `FutureValue { time: ${this.time}, value: ${this.value} }`
+  }
+
+  write (t, x) {
     setFuture(t, x, this)
     return this
   }
@@ -37,16 +53,41 @@ class Never {
     this.value = undefined
   }
 
-  map(f) {
+  map (f) {
     return this
   }
 
-  write(t, x) {
+  extend (f) {
+    return this
+  }
+
+  write (t, x) {
     throw new Error('Can\'t set never')
   }
 }
 
-export const never = new Never()
+// at :: Time -> a -> FutureValue t a
+// Create a new FutureValue whose value arrived at time t
+const at = (t, x) => new FutureValue(t, x)
+
+export const never = new (class Never {
+  constructor() {
+    this.time = Infinity
+    this.value = undefined
+  }
+
+  map (f) {
+    return this
+  }
+
+  extend (f) {
+    return this
+  }
+
+  write (t, x) {
+    throw new Error('Can\'t set never')
+  }
+})
 
 export const map = (f, future) =>
   future.time < Infinity ? at(future.time, F.map(f,future.value))
@@ -106,19 +147,19 @@ class Race {
 function when(action, future) {
   if(future.time < Infinity) {
     action.run(future)
-  } if (future.action === undefined) {
-    future.action = action
+  } if (future._action === undefined) {
+    future._action = action
   } else {
-    future[future.length++] = action
+    future[future._length++] = action
   }
 }
 
 // Run all the awaiting actions when a future value is set
 function runActions(future) {
-  future.action.run(future)
-  future.action = undefined
+  future._action.run(future)
+  future._action = undefined
 
-  for (let i = 0; i < future.length; ++i) {
+  for (let i = 0; i < future._length; ++i) {
     future[i].run(future)
     future[i] = undefined
   }
@@ -133,7 +174,7 @@ function setFuture(t, x, future) {
   future.time = t
   future.value = x
 
-  if(future.action === undefined) {
+  if(future._action === undefined) {
     return
   }
 

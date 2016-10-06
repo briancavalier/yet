@@ -2,11 +2,6 @@ import { pending } from './FutureValue'
 import { killBoth, neverKill } from './kill'
 import * as F from './fn'
 
-// task :: ((a -> ()) -> Kill) -> Task a
-// Create a Task that will produce a result by running a function
-export const task = run =>
-  new Task(resolver, run)
-
 // run :: Task a -> (KillFunc, FutureValue a)
 // Execute a Task that will produce a result.  Returns a function to
 // kill the in-progress Task and a FutureValue representing the
@@ -16,6 +11,16 @@ export const runTask = task => {
   const kill = task.run(Date.now, new SetFutureValue(futureValue))
   return [kill, futureValue]
 }
+
+// task :: ((a -> ()) -> Kill) -> Task a
+// Create a Task that will produce a result by running a function
+export const task = run =>
+  new Task(resolver, run)
+
+// of :: a -> Task a
+// Create a Task whose result is x
+export const of = x =>
+  new Task(just, x)
 
 // race :: Task a -> Task a -> Task a
 // Given two Tasks, return a Task equivalent to the one that produces a
@@ -30,10 +35,18 @@ export const lift2 = (abc, ta, tb) =>
 
 // Task type
 // A composable unit of async work that produces a FutureValue
-class Task {
+export class Task {
   constructor (runTask, state) {
     this.runTask = runTask
     this.state = state
+  }
+
+  static of (x) {
+    return of(x)
+  }
+
+  of (x) {
+    return of(x)
   }
 
   map (ab) {
@@ -48,10 +61,26 @@ class Task {
     return new Task(chainTask, { atb, task: this })
   }
 
+  concat (t2) {
+    return lift2(F.concat, this, t2)
+  }
+
+  extend (f) {
+    return this.map(F.compose(f, of))
+  }
+
+  toString () {
+    return `Task { runTask: ${this.runTask}, state: ${this.state} }`
+  }
+
   run (now, action) {
     return this.runTask(now, action, this.state)
   }
 }
+
+// a Task whose result is already known
+const just = (now, action, x) =>
+  action.react(0, x)
 
 // Run a callback-accepting function to produce a result
 const resolver = (now, action, run) =>
