@@ -65,8 +65,8 @@ export class Task {
     return lift2(F.concat, this, t2)
   }
 
-  extend (f) {
-    return this.map(F.compose(f, of))
+  extend (tab) {
+    return new Task(extendTask, { tab, task: this })
   }
 
   toString () {
@@ -194,5 +194,20 @@ class LiftVar {
   react (t, x) {
     this.value = x
     return this.check(t)
+  }
+}
+
+const extendTask = (now, action, { tab, task }) =>
+  task.run(now, new Extend(tab, action))
+
+class Extend {
+  constructor (tab, action) {
+    this.tab = tab
+    this.action = action
+  }
+
+  react (t, x) {
+    const tab = this.tab
+    return this.action.react(t, tab(of(x)))
   }
 }
