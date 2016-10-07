@@ -87,13 +87,13 @@ const resolver = (now, action, run) =>
   run(x => action.react(now(), x))
 
 class SetFutureValue {
-    constructor (futureValue) {
-      this.futureValue = futureValue
-    }
+  constructor (futureValue) {
+    this.futureValue = futureValue
+  }
 
-    react(t, x) {
-      return this.futureValue.write(t, x)
-    }
+  react (t, x) {
+    return this.futureValue.write(t, x)
+  }
 }
 
 // A Task whose value is the mapped result of another Task
@@ -114,7 +114,7 @@ class Mapped {
 // Task that appends more work to another Task, taking the
 // previous Task's output as input
 const chainTask = (now, action, { atb, task }) => {
-  const unlessKilled = new UnlessKilled(action);
+  const unlessKilled = new UnlessKilled(action)
   return killBoth(unlessKilled, task.run(now, new Chained(now, atb, unlessKilled)))
 }
 
