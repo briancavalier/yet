@@ -1,17 +1,9 @@
 import * as F from './fn'
 
-// of :: a -> FutureValue a
-// Create a FutureValue whose value has always been known to be x
-export const of = x => at(0, x)
-
-// pending :: () -> FutureValue t a
-// Create a new FutureValue whose value isn't known yet
-export const pending = () => at(Infinity, undefined)
-
 // Conceptually, a FutureValue is a value that becomes known
 // at a specific time (the temperature outside next Tuesday at 5pm).
-// Neither the time nor value can be known until the time occurs.
-// Mechanically, here, it's a write-once, immutable container for a
+// Neither the time nor value can be known until the time arrives.
+// Mechanically, it's a write-once, immutable container for a
 // (time, value) pair, that allows zero or more awaiters.
 export class FutureValue {
   constructor (time, value) {
@@ -29,6 +21,22 @@ export class FutureValue {
     return of(x)
   }
 
+  static empty () {
+    return never
+  }
+
+  empty () {
+    return never
+  }
+
+  concat (fv) {
+    return lift2(F.concat, this, fv)
+  }
+
+  or (fv) {
+    return earliest(preferLeft, this, fv)
+  }
+
   map (f) {
     return map(f, this)
   }
@@ -38,7 +46,7 @@ export class FutureValue {
   }
 
   toString () {
-    return `FutureValue { time: ${this.time}, value: ${this.value} }`
+    return `${this.constructor.name} { time: ${this.time}, value: ${this.value} }`
   }
 
   write (t, x) {
@@ -47,14 +55,29 @@ export class FutureValue {
   }
 }
 
+// pending :: () -> FutureValue t a
+// Create a new FutureValue whose value isn't known yet
+export const pending = () => at(Infinity, undefined)
+
 // at :: Time -> a -> FutureValue t a
 // Create a new FutureValue whose value arrived at time t
 const at = (t, x) => new FutureValue(t, x)
 
-export const never = new (class Never {
+// of :: a -> FutureValue a
+// Create a FutureValue whose value has always been known to be x
+const of = x => at(0, x)
+
+export const never = new (class Never extends FutureValue {
   constructor () {
-    this.time = Infinity
-    this.value = undefined
+    super(Infinity, undefined)
+  }
+
+  concat (fv) {
+    return this
+  }
+
+  or (fv) {
+    return fv
   }
 
   map (f) {
@@ -66,16 +89,45 @@ export const never = new (class Never {
   }
 
   write (t, x) {
-    throw new Error('Can\'t set never')
+    throw new Error('Can\'t write never')
   }
 })()
 
-export const map = (f, future) =>
+const lift2 = (f, fv1, fv2) =>
+  fv1.time < Infinity && fv2.time < Infinity
+    ? at(Math.max(fv1.time, fv2.time), f(fv1.value, fv2.value))
+    : whenLift2(f, fv1, fv2, pending())
+
+const whenLift2 = (f, fv1, fv2, futureResult) => {
+  const awaitBoth = new AwaitBoth(f, fv1, fv2, futureResult)
+  when(awaitBoth, fv1)
+  when(awaitBoth, fv2)
+  return futureResult
+}
+
+class AwaitBoth {
+  constructor (f, fv1, fv2, future) {
+    this.count = 2
+    this.f = f
+    this.future = future
+    this.fv1 = fv1
+    this.fv2 = fv2
+  }
+
+  run (fv) {
+    if(--this.count === 0) {
+      const f = this.f
+      this.future.write(fv.time, f(this.fv1.value, this.fv2.value))
+    }
+  }
+}
+
+const map = (f, future) =>
   future.time < Infinity
     ? at(future.time, F.map(f, future.value))
-    : mapFuture(f, future, pending())
+    : mapWhen(f, future, pending())
 
-function mapFuture (f, future, futureResult) {
+function mapWhen (f, future, futureResult) {
   when(new Map(f, futureResult), future)
   return futureResult
 }
@@ -94,9 +146,9 @@ class Map {
 const extend = (f, future) =>
   future.time < Infinity
     ? at(future.time, f(future))
-    : extendFuture(f, future, pending())
+    : extendWhen(f, future, pending())
 
-function extendFuture (f, future, futureResult) {
+function extendWhen (f, future, futureResult) {
   when(new Extend(f, futureResult), future)
   return futureResult
 }
@@ -117,11 +169,11 @@ class Extend {
 // two FutureValue
 export const earliest = (breakTie, fv1, fv2) =>
   fv1.time === Infinity && fv2.time === Infinity
-    ? raceFutureWith(breakTie, fv1, fv2, pending()) // both pending
+    ? earliestWhen(breakTie, fv1, fv2, pending()) // both pending
     : earliestOf(breakTie, fv1, fv2) // one isn't pending
 
-const raceFutureWith = (breakTie, fv1, fv2, futureResult) => {
-  const race = new Race(breakTie, fv1, fv2, futureResult)
+const earliestWhen = (breakTie, fv1, fv2, futureResult) => {
+  const race = new Earliest(breakTie, fv1, fv2, futureResult)
   when(race, fv1)
   when(race, fv2)
   return futureResult
@@ -132,7 +184,9 @@ const earliestOf = (breakTie, fv1, fv2) =>
     ? breakTie(fv1, fv2) ? fv1 : fv2
     : fv1.time < fv2.time ? fv1 : fv2
 
-class Race {
+const preferLeft = () => true
+
+class Earliest {
   constructor (breakTie, fv1, fv2, future) {
     this.breakTie = breakTie
     this.fv1 = fv1
@@ -169,10 +223,10 @@ function runActions (future) {
   }
 }
 
-// Set the time and value of a future, triggering all awaiters
+// Set the time and value of a pending future, triggering all awaiters
 function setFuture (t, x, future) {
   if (future.time < Infinity) {
-    throw new Error('FutureValue already set')
+    throw new Error('FutureValue already written')
   }
 
   future.time = t

@@ -12,10 +12,15 @@ export const lift2 = (f, a, b) =>
 export const ap = (ab, a) =>
   typeof ab.ap === 'function' ? ab.ap(a)
     : typeof ab === 'function' ? x => ab(x)(a(x))
-      : ab.reduce((acc, f) => concat(acc, map(f, a)), [])
+    : ab.reduce((acc, f) => concat(acc, map(f, a)), [])
 
 export const apply = (f, a) =>
   f(a)
 
-export const concat = (a, b) =>
-  a.concat(b)
+export const apply2 = (f, a, b) =>
+  f(a, b)
+
+export const concat = (a, b) => {
+  console.log(a, b)
+  return a.concat(b)
+}

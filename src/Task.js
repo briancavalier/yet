@@ -31,7 +31,10 @@ export const race = (t1, t2) =>
 // lift2 :: (a -> b -> c) -> Task a -> Task b -> Task c
 // Combine the results of 2 tasks
 export const lift2 = (abc, ta, tb) =>
-  new Task(lift2Tasks, { abc, ta, tb })
+  lift2With(F.lift2, abc, ta, tb)
+
+const lift2With = (apply, abc, ta, tb) =>
+  new Task(lift2Tasks, { apply, abc, ta, tb })
 
 // Task type
 // A composable unit of async work that produces a FutureValue
@@ -49,6 +52,14 @@ export class Task {
     return of(x)
   }
 
+  static empty () {
+    return neverTask
+  }
+
+  empty () {
+    return neverTask
+  }
+
   map (ab) {
     return new Task(mapTask, { ab, task: this })
   }
@@ -62,21 +73,55 @@ export class Task {
   }
 
   concat (t2) {
-    return lift2(F.concat, this, t2)
+    return lift2With(F.apply2, F.concat, this, t2)
   }
 
   extend (tab) {
     return new Task(extendTask, { tab, task: this })
   }
 
-  toString () {
-    return `Task { runTask: ${this.runTask}, state: ${this.state} }`
-  }
-
   run (now, action) {
     return this.runTask(now, action, this.state)
   }
+
+  toString () {
+    return `Task { runTask: ${this.runTask}, state: ${this.state} }`
+  }
 }
+
+const neverTask = new (class NeverTask extends Task {
+  constructor () {
+    super(undefined, undefined)
+  }
+
+  map (ab) {
+    return this
+  }
+
+  ap (tfab) {
+    return this
+  }
+
+  chain (atb) {
+    return this
+  }
+
+  concat (t) {
+    return this
+  }
+
+  extend (tab) {
+    return this
+  }
+
+  run (now, action) {
+    return neverKill
+  }
+
+  toString () {
+    return 'NeverTask {}'
+  }
+})
 
 // a Task whose result is already known
 const just = (now, action, x) =>
@@ -170,12 +215,12 @@ class Raced {
   }
 }
 
-const lift2Tasks = (now, action, { abc, ta, tb }) => {
+const lift2Tasks = (now, action, { apply, abc, ta, tb }) => {
   // TODO: find a better way
   // Kinda gross: closing over too much and allocating 2 objects
   let count = 2
   const check = t =>
-    --count === 0 && action.react(t, F.lift2(abc, a.value, b.value))
+    --count === 0 && action.react(t, apply(abc, a.value, b.value))
 
   const a = new LiftVar(check)
   const b = new LiftVar(check)

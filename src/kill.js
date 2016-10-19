@@ -2,6 +2,7 @@
 // with the provided key.
 // const timer = killWith(clearTimeout, setTimeout(timerFunc, ms))
 // timer.kill() // timerFunc won't be called
+
 export const killWith = (kill, key) => new KillWith(kill, key)
 
 class KillWith {
@@ -31,6 +32,6 @@ class KillBoth {
   }
 }
 
-export const neverKill = {
+export const neverKill = new (class NeverKill {
   kill () {}
-}
+})
