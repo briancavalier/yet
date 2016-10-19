@@ -121,7 +121,7 @@ const neverTask = new (class NeverTask extends Task {
   toString () {
     return 'NeverTask {}'
   }
-})
+})()
 
 // a Task whose result is already known
 const just = (now, action, x) =>

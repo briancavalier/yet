@@ -34,4 +34,4 @@ class KillBoth {
 
 export const neverKill = new (class NeverKill {
   kill () {}
-})
+})()

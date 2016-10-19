@@ -115,7 +115,7 @@ class AwaitBoth {
   }
 
   run (fv) {
-    if(--this.count === 0) {
+    if (--this.count === 0) {
       const f = this.f
       this.future.write(fv.time, f(this.fv1.value, this.fv2.value))
     }
