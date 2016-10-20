@@ -1,4 +1,4 @@
-import { pending } from './FutureValue'
+import { pending, FutureValue } from './FutureValue'
 import { killBoth, neverKill } from './kill'
 import * as F from './fn'
 
@@ -7,9 +7,11 @@ import * as F from './fn'
 // kill the in-progress Task and a FutureValue representing the
 // eventual result.
 export const runTask = task => {
-  const futureValue = pending()
-  const kill = task.run(Date.now, new SetFutureValue(futureValue))
+  const { kill, futureValue } = task.run(Date.now)
   return [kill, futureValue]
+  // const futureValue = pending()
+  // const kill = task.run(Date.now, new SetFutureValue(futureValue))
+  // return [kill, futureValue]
 }
 
 // task :: ((a -> ()) -> Kill) -> Task a
@@ -81,7 +83,7 @@ export class Task {
   }
 
   run (now, action) {
-    return this.runTask(now, action, this.state)
+    return this.runTask(now, this.state)
   }
 
   toString () {
@@ -124,36 +126,20 @@ const neverTask = new (class NeverTask extends Task {
 })()
 
 // a Task whose result is already known
-const just = (now, action, x) =>
-  action.react(0, x)
+const just = (now, x) =>
+  ({ kill: neverKill, futureValue: FutureValue.of(x) })
 
 // Run a callback-accepting function to produce a result
-const resolver = (now, action, run) =>
-  run(x => action.react(now(), x))
-
-class SetFutureValue {
-  constructor (futureValue) {
-    this.futureValue = futureValue
-  }
-
-  react (t, x) {
-    return this.futureValue.write(t, x)
-  }
+const resolver = (now, run) => {
+  const futureValue = pending()
+  const kill = run(x => futureValue.write(now(), x))
+  return { kill, futureValue }
 }
 
 // A Task whose value is the mapped result of another Task
-const mapTask = (now, action, { ab, task }) =>
-  task.run(now, new Mapped(ab, action))
-
-class Mapped {
-  constructor (ab, action) {
-    this.ab = ab
-    this.action = action
-  }
-
-  react (t, x) {
-    return this.action.react(t, F.map(this.ab, x))
-  }
+const mapTask = (now, { ab, task }) => {
+  const { kill, futureValue } = task.run(now)
+  return { kill, futureValue: futureValue.map(ab) }
 }
 
 // Task that appends more work to another Task, taking the
