@@ -41,6 +41,10 @@ export class FutureValue {
     return map(f, this)
   }
 
+  chain (f) {
+    return chain(f, this)
+  }
+
   extend (f) {
     return extend(f, this)
   }
@@ -81,6 +85,10 @@ export const never = new (class Never extends FutureValue {
   }
 
   map (f) {
+    return this
+  }
+
+  chain (f) {
     return this
   }
 
@@ -143,6 +151,49 @@ class Map {
   }
 }
 
+const chain = (f, future) =>
+  future.time < Infinity
+    ? join(f(future.value), future.time)
+    : chainWhen(f, future, pending())
+
+function chainWhen (f, future, futureResult) {
+  when(new Chain(f, futureResult), future)
+  return futureResult
+}
+
+const join = (future, t) =>
+  future.time < Infinity
+    ? future
+    : joinWhen(future, t, pending())
+
+const joinWhen = (future, t, futureResult) => {
+  when(new Join(t, futureResult), future)
+  return futureResult
+}
+
+class Chain {
+  constructor (f, future) {
+    this.f = f
+    this.future = future
+  }
+
+  run (fv) {
+    const f = this.f
+    when(new Join(fv.time, this.future), f(fv.value))
+  }
+}
+
+class Join {
+  constructor (time, future) {
+    this.time = time
+    this.future = future
+  }
+
+  run (fv) {
+    this.future.write(Math.max(this.time, fv.time), fv.value)
+  }
+}
+
 const extend = (f, future) =>
   future.time < Infinity
     ? at(future.time, f(future))
@@ -202,7 +253,7 @@ class Earliest {
 
 // Add an action to the awaiters for the provided future
 // or execute it immediately if the future's value is known
-function when (action, future) {
+export function when (action, future) {
   if (future.time < Infinity) {
     action.run(future)
   } if (future._action === undefined) {
