@@ -21,16 +21,12 @@ export class FutureValue {
     return of(x)
   }
 
-  static empty () {
-    return never
-  }
-
-  empty () {
+  never () {
     return never
   }
 
   concat (fv) {
-    return lift2(F.concat, this, fv)
+    return concat(this, fv)
   }
 
   or (fv) {
@@ -101,31 +97,37 @@ export const never = new (class Never extends FutureValue {
   }
 })()
 
-const lift2 = (f, fv1, fv2) =>
+export const lift2 = (f, fv1, fv2) =>
   fv1.time < Infinity && fv2.time < Infinity
-    ? at(Math.max(fv1.time, fv2.time), f(fv1.value, fv2.value))
-    : whenLift2(f, fv1, fv2, pending())
+    ? at(Math.max(fv1.time, fv2.time), F.lift2(f, fv1.value, fv2.value))
+    : whenLift2(F.lift2, f, fv1, fv2, pending())
 
-const whenLift2 = (f, fv1, fv2, futureResult) => {
-  const awaitBoth = new AwaitBoth(f, fv1, fv2, futureResult)
+export const concat = (fv1, fv2) =>
+  fv1.time < Infinity && fv2.time < Infinity
+    ? at(Math.max(fv1.time, fv2.time), F.concat(fv1.value, fv2.value))
+    : whenLift2(F.apply2, F.concat, fv1, fv2, pending())
+
+const whenLift2 = (apply, f, fv1, fv2, futureResult) => {
+  const awaitBoth = new AwaitBoth(apply, f, fv1, fv2, futureResult)
   when(awaitBoth, fv1)
   when(awaitBoth, fv2)
   return futureResult
 }
 
 class AwaitBoth {
-  constructor (f, fv1, fv2, future) {
+  constructor (apply, f, fv1, fv2, future) {
     this.count = 2
+    this.apply = apply
     this.f = f
-    this.future = future
     this.fv1 = fv1
     this.fv2 = fv2
+    this.future = future
   }
 
   run (fv) {
     if (--this.count === 0) {
-      const f = this.f
-      this.future.write(fv.time, f(this.fv1.value, this.fv2.value))
+      const apply = this.apply
+      this.future.write(fv.time, apply(this.f, this.fv1.value, this.fv2.value))
     }
   }
 }

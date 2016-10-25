@@ -1,5 +1,5 @@
-import { pending, FutureValue } from './FutureValue'
-import { killBoth, neverKill } from './kill'
+import { pending, when, FutureValue } from './FutureValue'
+import { killBoth, killWith, neverKill } from './kill'
 import * as F from './fn'
 
 // run :: Task a -> (KillFunc, FutureValue a)
@@ -33,10 +33,7 @@ export const race = (t1, t2) =>
 // lift2 :: (a -> b -> c) -> Task a -> Task b -> Task c
 // Combine the results of 2 tasks
 export const lift2 = (abc, ta, tb) =>
-  lift2With(F.lift2, abc, ta, tb)
-
-const lift2With = (apply, abc, ta, tb) =>
-  new Task(lift2Tasks, { apply, abc, ta, tb })
+  new Task(lift2Tasks, { abc, ta, tb })
 
 // Task type
 // A composable unit of async work that produces a FutureValue
@@ -54,11 +51,7 @@ export class Task {
     return of(x)
   }
 
-  static empty () {
-    return neverTask
-  }
-
-  empty () {
+  static never () {
     return neverTask
   }
 
@@ -75,7 +68,7 @@ export class Task {
   }
 
   concat (t2) {
-    return lift2With(F.apply2, F.concat, this, t2)
+    return new Task(concatTasks, { t1: this, t2 })
   }
 
   extend (tab) {
@@ -144,101 +137,40 @@ const mapTask = (now, { ab, task }) => {
 
 // Task that appends more work to another Task, taking the
 // previous Task's output as input
-const chainTask = (now, action, { atb, task }) => {
-  const unlessKilled = new UnlessKilled(action)
-  return killBoth(unlessKilled, task.run(now, new Chained(now, atb, unlessKilled)))
+const chainTask = (now, { atb, task }) => {
+  const { kill, futureValue } = task.run(now)
+  const next = futureValue.extend(({ value }) => atb(value).run(now))
+  return { kill: killBoth(kill, killWith(killWhen, next)), futureValue: next.chain(extractFutureValue) }
 }
 
-class Chained {
-  constructor (now, atb, action) {
-    this.now = now
-    this.atb = atb
-    this.action = action
-  }
-
-  react (t, x) {
-    const atb = this.atb
-    return atb(x).run(this.now, this.action)
-  }
+const extractFutureValue = ({ futureValue }) => futureValue
+const killWhen = (future) => when(killFuture, future)
+const killFuture = {
+  run: fv => fv.value.kill.kill()
 }
 
-class UnlessKilled {
-  constructor (action) {
-    this.action = action
-  }
+const raceTasks = (now, { t1, t2 }) => {
+  const { kill: k1, futureValue: f1 } = t1.run(now)
+  const { kill: k2, futureValue: f2 } = t2.run(now)
 
-  react (t, x) {
-    return this.action.react(t, x)
-  }
-
-  kill () {
-    this.action = emptyAction
-  }
+  return { kill: killBoth(k1, k2), futureValue: f1.or(f2) }
 }
 
-const emptyAction = {
-  react (t, x) {}
+const concatTasks = (now, { t1, t2 }) => {
+  const { kill: k1, futureValue: f1 } = t1.run(now)
+  const { kill: k2, futureValue: f2 } = t2.run(now)
+
+  return { kill: killBoth(k1, k2), futureValue: f1.concat(f2) }
 }
 
-const raceTasks = (now, action, { t1, t2 }) => {
-  const r1 = new Raced(action)
-  const r2 = new Raced(action)
-  r2.kill = t1.run(now, r1)
-  r1.kill = t2.run(now, r2)
+const lift2Tasks = (now, { abc, ta, tb }) => {
+  const { kill: ka, futureValue: fa } = ta.run(now)
+  const { kill: kb, futureValue: fb } = tb.run(now)
 
-  return killBoth(r1.kill, r2.kill)
+  return { kill: killBoth(ka, kb), futureValue: F.lift2(abc, fa, fb) }
 }
 
-class Raced {
-  constructor (action) {
-    this.kill = neverKill
-    this.action = action
-  }
-
-  react (t, x) {
-    this.kill.kill()
-    this.action.react(t, x)
-  }
-}
-
-const lift2Tasks = (now, action, { apply, abc, ta, tb }) => {
-  // TODO: find a better way
-  // Kinda gross: closing over too much and allocating 2 objects
-  let count = 2
-  const check = t =>
-    --count === 0 && action.react(t, apply(abc, a.value, b.value))
-
-  const a = new LiftVar(check)
-  const b = new LiftVar(check)
-
-  return killBoth(ta.run(now, a), tb.run(now, b))
-}
-
-// mutable container to hold task results for in-flight
-// liftN operations
-class LiftVar {
-  constructor (check) {
-    this.check = check
-    this.value = undefined
-  }
-
-  react (t, x) {
-    this.value = x
-    return this.check(t)
-  }
-}
-
-const extendTask = (now, action, { tab, task }) =>
-  task.run(now, new Extend(tab, action))
-
-class Extend {
-  constructor (tab, action) {
-    this.tab = tab
-    this.action = action
-  }
-
-  react (t, x) {
-    const tab = this.tab
-    return this.action.react(t, tab(of(x)))
-  }
+const extendTask = (now, { tab, task }) => {
+  const { kill, futureValue } = task.run(now)
+  return { kill, futureValue: futureValue.map(Task.of).map(tab) }
 }

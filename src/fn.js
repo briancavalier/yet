@@ -20,7 +20,5 @@ export const apply = (f, a) =>
 export const apply2 = (f, a, b) =>
   f(a, b)
 
-export const concat = (a, b) => {
-  console.log(a, b)
-  return a.concat(b)
-}
+export const concat = (a, b) =>
+  a.concat(b)
