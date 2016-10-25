@@ -2,16 +2,13 @@ import { pending, when, FutureValue } from './FutureValue'
 import { killBoth, killWith, neverKill } from './kill'
 import * as F from './fn'
 
-// run :: Task a -> (KillFunc, FutureValue a)
+// run :: Task a -> [Kill, FutureValue a]
 // Execute a Task that will produce a result.  Returns a function to
 // kill the in-progress Task and a FutureValue representing the
 // eventual result.
 export const runTask = task => {
   const { kill, futureValue } = task.run(Date.now)
   return [kill, futureValue]
-  // const futureValue = pending()
-  // const kill = task.run(Date.now, new SetFutureValue(futureValue))
-  // return [kill, futureValue]
 }
 
 // task :: ((a -> ()) -> Kill) -> Task a
@@ -22,7 +19,7 @@ export const task = run =>
 // of :: a -> Task a
 // Create a Task whose result is x
 export const of = x =>
-  new Task(just, x)
+  new Task(just, FutureValue.of(x))
 
 // race :: Task a -> Task a -> Task a
 // Given two Tasks, return a Task equivalent to the one that produces a
@@ -118,9 +115,15 @@ const neverTask = new (class NeverTask extends Task {
   }
 })()
 
+// NOTE: These implementations prefer simplicity and
+// being obviously correct over efficiency.  If efficiency
+// becomes an issue, Task could be switched to a more
+// efficient implementation that doesn't avoids creating
+// intermediate FutureValues internally.
+
 // a Task whose result is already known
 const just = (now, x) =>
-  ({ kill: neverKill, futureValue: FutureValue.of(x) })
+  ({ kill: neverKill, futureValue: x })
 
 // Run a callback-accepting function to produce a result
 const resolver = (now, run) => {
