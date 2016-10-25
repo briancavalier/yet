@@ -156,14 +156,6 @@ or :: FutureValue a ~> FutureValue a -> FutureValue a
 
 Return a FutureValue that is equivalent to the earlier of two FutureValues, preferring the first if the FutureValues are simultaneous.
 
-### earliest
-
-```hs
-earliest :: (FutureValue a -> FutureValue a -> FutureValue a) -> FutureValue a -> FutureValue a -> FutureValue a
-```
-
-Return a FutureValue that is equivalent to the earlier of two FutureValues. If the two FutureValues are simultaneous, the provided tie breaker function is used to pick a winner.
-
 ### concat
 
 ```hs
