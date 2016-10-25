@@ -30,11 +30,15 @@ export class FutureValue {
   }
 
   or (fv) {
-    return earliest(preferLeft, this, fv)
+    return earliest(preferFirst, this, fv)
   }
 
   map (f) {
     return map(f, this)
+  }
+
+  ap (fvab) {
+    return lift2(F.apply, fvab, this)
   }
 
   chain (f) {
@@ -234,10 +238,10 @@ const earliestWhen = (breakTie, fv1, fv2, futureResult) => {
 
 const earliestOf = (breakTie, fv1, fv2) =>
   fv1.time === fv2.time
-    ? breakTie(fv1, fv2) ? fv1 : fv2
+    ? breakTie(fv1, fv2)
     : fv1.time < fv2.time ? fv1 : fv2
 
-const preferLeft = () => true
+const preferFirst = (fv1, fv2) => fv1
 
 class Earliest {
   constructor (breakTie, fv1, fv2, future) {

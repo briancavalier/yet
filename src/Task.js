@@ -19,7 +19,7 @@ export const task = run =>
 // of :: a -> Task a
 // Create a Task whose result is x
 export const of = x =>
-  new Task(just, FutureValue.of(x))
+  fromFutureValue(FutureValue.of(x))
 
 // race :: Task a -> Task a -> Task a
 // Given two Tasks, return a Task equivalent to the one that produces a
@@ -49,7 +49,7 @@ export class Task {
   }
 
   static never () {
-    return neverTask
+    return fromFutureValue(FutureValue.never())
   }
 
   map (ab) {
@@ -64,6 +64,10 @@ export class Task {
     return new Task(chainTask, { atb, task: this })
   }
 
+  or (t2) {
+    return race(this, t2)
+  }
+
   concat (t2) {
     return new Task(concatTasks, { t1: this, t2 })
   }
@@ -72,7 +76,7 @@ export class Task {
     return new Task(extendTask, { tab, task: this })
   }
 
-  run (now, action) {
+  run (now) {
     return this.runTask(now, this.state)
   }
 
@@ -80,40 +84,6 @@ export class Task {
     return `Task { runTask: ${this.runTask}, state: ${this.state} }`
   }
 }
-
-const neverTask = new (class NeverTask extends Task {
-  constructor () {
-    super(undefined, undefined)
-  }
-
-  map (ab) {
-    return this
-  }
-
-  ap (tfab) {
-    return this
-  }
-
-  chain (atb) {
-    return this
-  }
-
-  concat (t) {
-    return this
-  }
-
-  extend (tab) {
-    return this
-  }
-
-  run (now, action) {
-    return neverKill
-  }
-
-  toString () {
-    return 'NeverTask {}'
-  }
-})()
 
 // NOTE: These implementations prefer simplicity and
 // being obviously correct over efficiency.  If efficiency
@@ -124,6 +94,9 @@ const neverTask = new (class NeverTask extends Task {
 // a Task whose result is already known
 const just = (now, x) =>
   ({ kill: neverKill, futureValue: x })
+
+const fromFutureValue = fv =>
+  new Task(just, fv)
 
 // Run a callback-accepting function to produce a result
 const resolver = (now, run) => {
@@ -175,5 +148,5 @@ const lift2Tasks = (now, { abc, ta, tb }) => {
 
 const extendTask = (now, { tab, task }) => {
   const { kill, futureValue } = task.run(now)
-  return { kill, futureValue: futureValue.map(Task.of).map(tab) }
+  return { kill, futureValue: futureValue.extend(fromFutureValue).map(tab) }
 }
