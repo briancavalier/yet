@@ -37,5 +37,8 @@
     "northbrook": "^3.2.1",
     "rollup": "^0.36.3",
     "rollup-plugin-buba": "^1.0.1"
+  },
+  "dependencies": {
+    "fantasy-land": "^2.1.0"
   }
 }
