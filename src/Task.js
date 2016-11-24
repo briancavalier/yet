@@ -1,6 +1,7 @@
 import { pending, when, FutureValue } from './FutureValue'
 import { killBoth, killWith, neverKill } from './kill'
 import * as F from './fn'
+import fl from 'fantasy-land'
 
 // run :: Task a -> [Kill, FutureValue a]
 // Execute a Task that will produce a result.  Returns a function to
@@ -44,10 +45,6 @@ export class Task {
     return of(x)
   }
 
-  of (x) {
-    return of(x)
-  }
-
   static never () {
     return fromFutureValue(FutureValue.never())
   }
@@ -82,6 +79,40 @@ export class Task {
 
   toString () {
     return `Task { runTask: ${this.runTask}, state: ${this.state} }`
+  }
+
+  // Fantasy-land
+
+  static [fl.of] (a) {
+    return Task.of(a)
+  }
+
+  static [fl.zero] () {
+    return Task.never()
+  }
+
+  [fl.alt] (t2) {
+    return this.or(t2)
+  }
+
+  [fl.concat] (t2) {
+    return this.concat(t2)
+  }
+
+  [fl.map] (tfab) {
+    return this.map(tfab)
+  }
+
+  [fl.ap] (tf) {
+    return this.ap(tf)
+  }
+
+  [fl.chain] (atb) {
+    return this.chain(atb)
+  }
+
+  [fl.extend] (tab) {
+    return this.extend(tab)
   }
 }
 

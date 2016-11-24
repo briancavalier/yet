@@ -1,4 +1,5 @@
 import * as F from './fn'
+import fl from 'fantasy-land'
 
 // Conceptually, a FutureValue is a value that becomes known
 // at a specific time (the temperature outside next Tuesday at 5pm).
@@ -17,11 +18,7 @@ export class FutureValue {
     return of(x)
   }
 
-  of (x) {
-    return of(x)
-  }
-
-  never () {
+  static never () {
     return never
   }
 
@@ -37,8 +34,8 @@ export class FutureValue {
     return map(f, this)
   }
 
-  ap (fvab) {
-    return lift2(F.apply, fvab, this)
+  ap (f) {
+    return lift2(F.apply, f, this)
   }
 
   chain (f) {
@@ -56,6 +53,40 @@ export class FutureValue {
   write (t, x) {
     setFuture(t, x, this)
     return this
+  }
+
+  // Fantasy-land
+
+  static [fl.of] (a) {
+    return FutureValue.of(a)
+  }
+
+  static [fl.zero] () {
+    return FutureValue.never()
+  }
+
+  [fl.alt] (fv) {
+    return this.or(fv)
+  }
+
+  [fl.concat] (fv) {
+    return this.concat(fv)
+  }
+
+  [fl.map] (f) {
+    return this.map(f)
+  }
+
+  [fl.ap] (f) {
+    return this.ap(f)
+  }
+
+  [fl.chain] (f) {
+    return this.chain(f)
+  }
+
+  [fl.extend] (f) {
+    return this.extend(f)
   }
 }
 
@@ -85,6 +116,10 @@ export const never = new (class Never extends FutureValue {
   }
 
   map (f) {
+    return this
+  }
+
+  ap (f) {
     return this
   }
 
